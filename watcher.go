@@ -3,6 +3,7 @@ package wonaming
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	consul "github.com/hashicorp/consul/api"
 	"google.golang.org/grpc/naming"
@@ -24,17 +25,43 @@ func (cw *ConsulWatcher) Close() {
 }
 
 func (cw *ConsulWatcher) Next() ([]*naming.Update, error) {
-	var q *consul.QueryOptions = nil
-	if cw.addrs != nil {
-		q = &consul.QueryOptions{WaitIndex: cw.li}
+	if cw.addrs == nil {
+		ticker := time.NewTicker(1 * time.Second)
+		for {
+			select {
+			case <-ticker.C:
+				addrs, li, err := cw.queryConsul(nil)
+				if err != nil {
+					return nil, err
+				}
+				if len(addrs) != 0 {
+					cw.addrs = addrs
+					cw.li = li
+					updates := genUpdates([]string{}, addrs)
+					return updates, nil
+				}
+			}
+		}
 	}
 
-	updates := []*naming.Update{}
-
-	// cs, meta, err := cw.cc.Catalog().Service(cw.cr.ServiceName, "", queryo)
-	cs, meta, err := cw.cc.Health().Service(cw.cr.ServiceName, "", true, q)
+	addrs, li, err := cw.queryConsul(&consul.QueryOptions{WaitIndex: cw.li})
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("consul query error: %v", err))
+	}
+
+	updates := genUpdates(cw.addrs, addrs)
+
+	// update addrs & last index
+	cw.addrs = addrs
+	cw.li = li
+
+	return updates, nil
+}
+
+func (cw *ConsulWatcher) queryConsul(q *consul.QueryOptions) ([]string, uint64, error) {
+	cs, meta, err := cw.cc.Health().Service(cw.cr.ServiceName, "", true, q)
+	if err != nil {
+		return nil, 0, errors.New(fmt.Sprintf("consul query error: %v", err))
 	}
 
 	addrs := make([]string, 0)
@@ -43,23 +70,24 @@ func (cw *ConsulWatcher) Next() ([]*naming.Update, error) {
 		addrs = append(addrs, fmt.Sprintf("%s:%d", s.Service.Address, s.Service.Port))
 	}
 
-	deleted := diff(cw.addrs, addrs)
+	return addrs, meta.LastIndex, nil
+}
+
+func genUpdates(a, b []string) []*naming.Update {
+	updates := []*naming.Update{}
+
+	deleted := diff(a, b)
 	for _, addr := range deleted {
 		update := &naming.Update{Op: naming.Delete, Addr: addr}
 		updates = append(updates, update)
 	}
 
-	added := diff(addrs, cw.addrs)
+	added := diff(b, a)
 	for _, addr := range added {
 		update := &naming.Update{Op: naming.Add, Addr: addr}
 		updates = append(updates, update)
 	}
-
-	// update addrs & last index
-	cw.addrs = addrs
-	cw.li = meta.LastIndex
-
-	return updates, nil
+	return updates
 }
 
 // diff(a, b) = a - a(n)b
