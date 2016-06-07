@@ -24,28 +24,23 @@ func (cw *ConsulWatcher) Close() {
 }
 
 func (cw *ConsulWatcher) Next() ([]*naming.Update, error) {
-	var queryo *consul.QueryOptions = nil
+	var q *consul.QueryOptions = nil
 	if cw.addrs != nil {
-		queryo = &consul.QueryOptions{WaitIndex: cw.li}
+		q = &consul.QueryOptions{WaitIndex: cw.li}
 	}
 
 	updates := []*naming.Update{}
 
-	cs, meta, err := cw.cc.Catalog().Service(cw.cr.ServiceName, "", queryo)
+	// cs, meta, err := cw.cc.Catalog().Service(cw.cr.ServiceName, "", queryo)
+	cs, meta, err := cw.cc.Health().Service(cw.cr.ServiceName, "", true, q)
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("consul query error: %v", err))
 	}
 
 	addrs := make([]string, 0)
 	for _, s := range cs {
-		// I'm not sure if ServiceAddress always has a value
-		// If it is "", use Address
-		sd := s.ServiceAddress
-		if sd == "" {
-			sd = s.Address
-		}
 		// addr should like: 127.0.0.1:8001
-		addrs = append(addrs, fmt.Sprintf("%s:%d", sd, s.ServicePort))
+		addrs = append(addrs, fmt.Sprintf("%s:%d", s.Service.Address, s.Service.Port))
 	}
 
 	deleted := diff(cw.addrs, addrs)
