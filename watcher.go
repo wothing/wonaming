@@ -1,8 +1,8 @@
 package wonaming
 
 import (
+	"errors"
 	"fmt"
-	"time"
 
 	consul "github.com/hashicorp/consul/api"
 	"google.golang.org/grpc/naming"
@@ -11,6 +11,8 @@ import (
 type ConsulWatcher struct {
 	cr *ConsulResolver
 	cc *consul.Client
+
+	// LastIndex to watch consul
 	li uint64
 
 	// before check: every value shoud be 1
@@ -22,54 +24,47 @@ func (cw *ConsulWatcher) Close() {
 }
 
 func (cw *ConsulWatcher) Next() ([]*naming.Update, error) {
-	if cw.addrs == nil {
-		cw.addrs = make([]string, 0)
+	var queryo *consul.QueryOptions = nil
+	if cw.addrs != nil {
+		queryo = &consul.QueryOptions{WaitIndex: cw.li}
 	}
 
 	updates := []*naming.Update{}
 
-	t := time.NewTimer(1 * time.Second)
-	select {
-	case <-t.C:
-		catAddrs, _, err := cw.cc.Catalog().Service(cw.cr.ServiceName, "", nil)
-		if err == nil {
-			addrNow := make([]string, 0)
-			for _, cs := range catAddrs {
-				// I'm not sure if ServiceAddress always has a value
-				// If it is "", use Address
-				sd := cs.ServiceAddress
-				if sd == "" {
-					sd = cs.Address
-				}
-				// addr should like: 127.0.0.1:8001
-				addrNow = append(addrNow, fmt.Sprintf("%s:%d", sd, cs.ServicePort))
-			}
-
-			deleted := diff(cw.addrs, addrNow)
-			for _, addr := range deleted {
-				update := &naming.Update{Op: naming.Delete, Addr: addr}
-				updates = append(updates, update)
-			}
-
-			added := diff(addrNow, cw.addrs)
-			for _, addr := range added {
-				update := &naming.Update{Op: naming.Add, Addr: addr}
-				updates = append(updates, update)
-			}
-
-			// update addrs
-			cw.addrs = addrNow
-
-			// if updates, return
-			if len(updates) != 0 {
-				return updates, nil
-			}
-		}
-
-		t.Reset(1 * time.Second)
+	cs, meta, err := cw.cc.Catalog().Service(cw.cr.ServiceName, "", queryo)
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("consul query error: %v", err))
 	}
 
-	return nil, nil
+	addrs := make([]string, 0)
+	for _, s := range cs {
+		// I'm not sure if ServiceAddress always has a value
+		// If it is "", use Address
+		sd := s.ServiceAddress
+		if sd == "" {
+			sd = s.Address
+		}
+		// addr should like: 127.0.0.1:8001
+		addrs = append(addrs, fmt.Sprintf("%s:%d", sd, s.ServicePort))
+	}
+
+	deleted := diff(cw.addrs, addrs)
+	for _, addr := range deleted {
+		update := &naming.Update{Op: naming.Delete, Addr: addr}
+		updates = append(updates, update)
+	}
+
+	added := diff(addrs, cw.addrs)
+	for _, addr := range added {
+		update := &naming.Update{Op: naming.Add, Addr: addr}
+		updates = append(updates, update)
+	}
+
+	// update addrs & last index
+	cw.addrs = addrs
+	cw.li = meta.LastIndex
+
+	return updates, nil
 }
 
 // diff(a, b) = a - a(n)b

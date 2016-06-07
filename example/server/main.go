@@ -1,10 +1,3 @@
-/**
- * Copyright 2015-2016, Wothing Co., Ltd.
- * All rights reserved.
- *
- * Created by Elvizlai on 2016/06/06 09:48
- */
-
 package main
 
 import (
@@ -40,7 +33,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("connecting to consul '%s': %s", *cons, err)
 	}
+	//generate id
 	regis := &consul.AgentServiceRegistration{
+		ID: fmt.Sprintf("%s-127.0.0.1-%d", *serv, *port)
 		Name: *serv,
 		Address: "127.0.0.1",
 		Port: *port,
@@ -60,5 +55,6 @@ type helloServer struct {
 }
 
 func (helloServer) SayHello(ctx context.Context, req *pb.HelloRequest) (*pb.HelloResponse, error) {
+	fmt.Printf("getting request from client.\n")
 	return &pb.HelloResponse{Reply: "Hello, " + req.Greeting}, nil
 }
