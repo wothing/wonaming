@@ -7,11 +7,11 @@ import (
 	"log"
 	"net"
 
-	consul "github.com/hashicorp/consul/api"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/grpclog"
 
+	"github.com/wothing/wonaming"
 	"github.com/wothing/wonaming/example/pb"
 )
 
@@ -30,23 +30,9 @@ func main() {
 		panic(err)
 	}
 
-	// self-registe service to consul
-	conf := &consul.Config{Scheme: "http", Address: *cons}
-	client, err := consul.NewClient(conf)
+	err = wonaming.Register(*serv, *port, *cons, "3s")
 	if err != nil {
-		log.Fatalf("connecting to consul '%s': %s", *cons, err)
-	}
-	check := &consul.AgentServiceCheck{Interval: "3s", Script: fmt.Sprintf(`curl http://%s:%d > /dev/null 2>&1`, "127.0.0.1", *port)}
-	regis := &consul.AgentServiceRegistration{
-		ID: fmt.Sprintf("%s-127.0.0.1-%d", *serv, *port),
-		Name: *serv,
-		Address: "127.0.0.1",
-		Port: *port,
-		Checks: consul.AgentServiceChecks{check},
-	}
-	err = client.Agent().ServiceRegister(regis)
-	if err != nil {
-		log.Fatalf("registering to consul error: %s", err)
+		panic(err)
 	}
 
 	log.Printf("starting hello service at %d", *port)
