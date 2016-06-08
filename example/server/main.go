@@ -3,13 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
+	"time"
 
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/grpclog"
 
 	wonaming "github.com/wothing/wonaming/consul"
 	"github.com/wothing/wonaming/example/pb"
@@ -23,14 +22,13 @@ var (
 
 func main() {
 	flag.Parse()
-	grpclog.SetLogger(log.New(ioutil.Discard, "", log.LstdFlags))
 
 	lis, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", *port))
 	if err != nil {
 		panic(err)
 	}
 
-	err = wonaming.Register(*serv, *port, *cons, "3s")
+	err = wonaming.Register(*serv, *port, *cons, time.Second*3, "5s")
 	if err != nil {
 		panic(err)
 	}
