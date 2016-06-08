@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/grpclog"
 
-	"github.com/wothing/wonaming"
+	wonaming "github.com/wothing/wonaming/consul"
 	"github.com/wothing/wonaming/example/pb"
 )
 

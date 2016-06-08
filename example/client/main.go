@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/wothing/wonaming"
+	wonaming "github.com/wothing/wonaming/consul"
 	"github.com/wothing/wonaming/example/pb"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"

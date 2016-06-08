@@ -1,4 +1,4 @@
-package wonaming
+package consul 
 
 import (
 	"errors"
