@@ -7,6 +7,7 @@ import (
 	"time"
 
 	consul "github.com/hashicorp/consul/api"
+	"github.com/wothing/wonaming/lib"
 	"google.golang.org/grpc/naming"
 )
 
@@ -38,7 +39,7 @@ func (cw *ConsulWatcher) Next() ([]*naming.Update, error) {
 				if len(addrs) != 0 {
 					cw.addrs = addrs
 					cw.li = li
-					updates := genUpdates([]string{}, addrs)
+					updates := lib.GenUpdates([]string{}, addrs)
 					return updates, nil
 				}
 				log.Println("no such service found in consul, retry")
@@ -51,7 +52,7 @@ func (cw *ConsulWatcher) Next() ([]*naming.Update, error) {
 		return nil, errors.New(fmt.Sprintf("consul query error: %v", err))
 	}
 
-	updates := genUpdates(cw.addrs, addrs)
+	updates := lib.GenUpdates(cw.addrs, addrs)
 
 	// update addrs & last index
 	cw.addrs = addrs
@@ -75,38 +76,3 @@ func (cw *ConsulWatcher) queryConsul(q *consul.QueryOptions) ([]string, uint64, 
 	return addrs, meta.LastIndex, nil
 }
 
-func genUpdates(a, b []string) []*naming.Update {
-	updates := []*naming.Update{}
-
-	deleted := diff(a, b)
-	for _, addr := range deleted {
-		update := &naming.Update{Op: naming.Delete, Addr: addr}
-		updates = append(updates, update)
-	}
-
-	added := diff(b, a)
-	for _, addr := range added {
-		update := &naming.Update{Op: naming.Add, Addr: addr}
-		updates = append(updates, update)
-	}
-	return updates
-}
-
-// diff(a, b) = a - a(n)b
-func diff(a, b []string) []string {
-	d := make([]string, 0)
-	for _, va := range a {
-		found := false
-		for _, vb := range b {
-			if va == vb {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			d = append(d, va)
-		}
-	}
-	return d
-}
