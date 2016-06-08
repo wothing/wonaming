@@ -46,28 +46,30 @@ func Register(sName string, sPort int, etcdAddr string, interval time.Duration, 
 
 		_, err := keyapi.Delete(context.Background(), serviceKey, &etcd.DeleteOptions{Recursive: true})
 		if err != nil {
-			log.Println("deregister service, result:", err)
+			log.Println("deregister service error: ", err)
 		}
 		os.Exit(0)
 	}()
 
 	go func() {
 		ticker := time.NewTicker(interval)
+		seto := &etcd.SetOptions{TTL: time.Duration(ttl) * time.Second, Refresh: true}
 		for {
 			<-ticker.C
-			if _, err := keyapi.Set(context.Background(), hostKey, "", &etcd.SetOptions{TTL: time.Duration(ttl) * time.Second, Refresh: true}); err != nil {
+			if _, err := keyapi.Set(context.Background(), hostKey, "", seto); err != nil {
 				log.Println("update ttl error: ", err)
 			}
-			if _, err := keyapi.Set(context.Background(), portKey, "", &etcd.SetOptions{TTL: time.Duration(ttl) * time.Second, Refresh: true}); err != nil {
+			if _, err := keyapi.Set(context.Background(), portKey, "", seto); err != nil {
 				log.Println("update ttl error: ", err)
 			}
 		}
 	}()
 
-	if _, err := keyapi.Set(context.Background(), hostKey, sAddr, &etcd.SetOptions{TTL: time.Duration(ttl) * time.Second}); err != nil {
+	seto := &etcd.SetOptions{TTL: time.Duration(ttl) * time.Second}
+	if _, err := keyapi.Set(context.Background(), hostKey, sAddr, seto); err != nil {
 		return err
 	}
-	if _, err := keyapi.Set(context.Background(), portKey, fmt.Sprintf("%d", sPort), &etcd.SetOptions{TTL: time.Duration(ttl) * time.Second}); err != nil {
+	if _, err := keyapi.Set(context.Background(), portKey, fmt.Sprintf("%d", sPort), seto); err != nil {
 		return err
 	}
 

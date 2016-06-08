@@ -32,20 +32,12 @@ func (ew *EtcdWatcher) Next() ([]*naming.Update, error) {
 		ew.addrs = make([]string, 0)
 
 		// query addresses from etcd
-		resp, err := keyapi.Get(context.Background(), key, &etcd.GetOptions{Recursive: true})
-		if err != nil {
-			etcderr, ok := err.(etcd.Error)
-			if !ok || etcderr.Code != etcd.ErrorCodeKeyNotFound {
-				return nil, err
-			}
-		}
-		if err == nil {
-			addrs := extractAddrs(resp)
-			if len(addrs) != 0 {
-				ew.addrs = addrs
-				updates := lib.GenUpdates([]string{}, addrs)
-				return updates, nil
-			}
+		resp, _:= keyapi.Get(context.Background(), key, &etcd.GetOptions{Recursive: true})
+		addrs := extractAddrs(resp)
+		if len(addrs) != 0 {
+			ew.addrs = addrs
+			updates := lib.GenUpdates([]string{}, addrs)
+			return updates, nil
 		}
 	}
 
@@ -75,7 +67,7 @@ func extractAddrs(resp *etcd.Response) []string {
 	}
 
 	for _, node := range resp.Node.Nodes {
-		// node should contain host & port sub-node
+		// node should contain host & port
 		host := ""
 		port := ""
 		for _, v := range node.Nodes {
