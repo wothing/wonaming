@@ -5,22 +5,25 @@ import (
 	"fmt"
 	"time"
 
-	wonaming "github.com/wothing/wonaming/consul"
+	// wonaming "github.com/wothing/wonaming/consul"
+	wonaming "github.com/wothing/wonaming/etcd"
 	"github.com/wothing/wonaming/example/pb"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
 var (
-	serv   = flag.String("service", "hello_service", "service name")
-	consul = flag.String("consul", "127.0.0.1:8500", "consul address")
+	serv = flag.String("service", "hello_service", "service name")
+	reg  = flag.String("reg", "127.0.0.1:8500", "register address")
 )
 
 func main() {
-	r := &wonaming.ConsulResolver{ServiceName: *serv}
+	flag.Parse()
+	// r := &wonaming.ConsulResolver{ServiceName: *serv}
+	r := &wonaming.EtcdResolver{ServiceName: *serv}
 	b := grpc.RoundRobin(r)
 
-	conn, err := grpc.Dial(*consul, grpc.WithInsecure(), grpc.WithBalancer(b))
+	conn, err := grpc.Dial(*reg, grpc.WithInsecure(), grpc.WithBalancer(b))
 	if err != nil {
 		panic(err)
 	}

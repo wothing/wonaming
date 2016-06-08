@@ -12,14 +12,14 @@ import (
 )
 
 // Register helps register consul
-func Register(sName string, sPort int, c string, interval time.Duration, ttl string) error {
+func Register(sName string, sPort int, consulAddr string, interval time.Duration, ttl int) error {
 	sAddr := "127.0.0.1"
 	env := os.Getenv("HOSTNAME")
 	if env != "" {
 		sAddr = env
 	}
 
-	conf := &consul.Config{Scheme: "http", Address: c}
+	conf := &consul.Config{Scheme: "http", Address: consulAddr}
 	client, err := consul.NewClient(conf)
 	if err != nil {
 		return err
@@ -37,15 +37,15 @@ func Register(sName string, sPort int, c string, interval time.Duration, ttl str
 	go func() {
 		ch := make(chan os.Signal, 1)
 		signal.Notify(ch, syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL)
-		log.Println("rec signal:", <-ch)
+		log.Println("rec signal: ", <-ch)
 
 		err = client.Agent().ServiceDeregister(serviceID)
 		if err != nil {
-			log.Println("deregister service, result:", err)
+			log.Println("deregister service, result: ", err)
 		}
 		err = client.Agent().CheckDeregister(serviceID)
 		if err != nil {
-			log.Println("deregister check, result:", err)
+			log.Println("deregister check, result: ", err)
 		}
 
 		os.Exit(0)
@@ -57,7 +57,7 @@ func Register(sName string, sPort int, c string, interval time.Duration, ttl str
 			<-ticker.C
 			err = client.Agent().UpdateTTL(serviceID, "", "passing")
 			if err != nil {
-				log.Println("update ttl error", err)
+				log.Println("update ttl error: ", err)
 			}
 		}
 	}()
@@ -67,6 +67,6 @@ func Register(sName string, sPort int, c string, interval time.Duration, ttl str
 		return err
 	}
 
-	check := consul.AgentServiceCheck{TTL: ttl, Status: "passing"}
+	check := consul.AgentServiceCheck{TTL: fmt.Sprintf("%ds", ttl), Status: "passing"}
 	return client.Agent().CheckRegister(&consul.AgentCheckRegistration{ID: serviceID, Name: sName, ServiceID: serviceID, AgentServiceCheck: check})
 }

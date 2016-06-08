@@ -5,8 +5,8 @@ import (
 
 	etcd "github.com/coreos/etcd/client"
 	"github.com/wothing/wonaming/lib"
-	"google.golang.org/grpc/naming"
 	"golang.org/x/net/context"
+	"google.golang.org/grpc/naming"
 )
 
 const (
@@ -16,9 +16,8 @@ const (
 type EtcdWatcher struct {
 	er *EtcdResolver
 	ec *etcd.Client
-	w  *etcd.Watcher
+	w  etcd.Watcher
 
-	li uint64
 	addrs []string
 }
 
@@ -26,15 +25,19 @@ func (ew *EtcdWatcher) Close() {
 }
 
 func (ew *EtcdWatcher) Next() ([]*naming.Update, error) {
+	keyapi := etcd.NewKeysAPI(*ew.ec)
+	key := fmt.Sprintf("/%s/%s", prefix, ew.er.ServiceName)
+
 	if ew.addrs == nil {
 		ew.addrs = make([]string, 0)
-		keyapi := etcd.NewKeysAPI(*ew.ec)
-		key := fmt.Sprintf("/%s/%s", )
 
-		// query addresses from etcd 
+		// query addresses from etcd
 		resp, err := keyapi.Get(context.Background(), key, &etcd.GetOptions{Recursive: true})
-		if err != nil && err.(etcd.Error).Code != etcd.ErrorCodeKeyNotFound {
-			return nil, err
+		if err != nil {
+			etcderr, ok := err.(etcd.Error)
+			if !ok || etcderr.Code != etcd.ErrorCodeKeyNotFound {
+				return nil, err
+			}
 		}
 		if err == nil {
 			addrs := extractAddrs(resp)
@@ -44,14 +47,15 @@ func (ew *EtcdWatcher) Next() ([]*naming.Update, error) {
 				return updates, nil
 			}
 		}
-
-		ew.w = keyapi.Watcher(key, &etcd.WatcherOptions{Recursive: true})
 	}
 
+	ew.w = keyapi.Watcher(key, &etcd.WatcherOptions{Recursive: true})
 	for {
-		resp, err := ew.w.Next(context.Background())
+		_, err := ew.w.Next(context.Background())
 		if err == nil {
-			addrs := extractAddrs(ersp)
+			// query addresses from etcd
+			resp, _:= keyapi.Get(context.Background(), key, &etcd.GetOptions{Recursive: true})
+			addrs := extractAddrs(resp)
 			updates := lib.GenUpdates(ew.addrs, addrs)
 
 			ew.addrs = addrs
@@ -61,22 +65,21 @@ func (ew *EtcdWatcher) Next() ([]*naming.Update, error) {
 		}
 	}
 
-	return []string{}, nil
+	return []*naming.Update{}, nil
 }
 
 func extractAddrs(resp *etcd.Response) []string {
 	addrs := []string{}
-	if resp == nil || resp.Node == nil || reponse.Node.Nodes == nil || len(reponse.Node.Nodes) == 0 {
-		return updates
+	if resp == nil || resp.Node == nil || resp.Node.Nodes == nil || len(resp.Node.Nodes) == 0 {
+		return addrs
 	}
 
-	key := resp.Node.Key
 	for _, node := range resp.Node.Nodes {
 		// node should contain host & port sub-node
 		host := ""
 		port := ""
-		for _, v := range node {
-			what := v.Key[len(v.Key) - 4, len(v.Key) - 1]
+		for _, v := range node.Nodes {
+			what := v.Key[len(v.Key)-4 : len(v.Key)]
 			if what == "host" {
 				host = v.Value
 			}
@@ -84,7 +87,9 @@ func extractAddrs(resp *etcd.Response) []string {
 				port = v.Value
 			}
 		}
-		addrs = append(addrs, fmt.Sprintf("%s:%s", host, port))
+		if host != "" && port != "" {
+			addrs = append(addrs, fmt.Sprintf("%s:%s", host, port))
+		}
 	}
 
 	return addrs

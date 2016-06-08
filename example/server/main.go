@@ -10,14 +10,15 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	wonaming "github.com/wothing/wonaming/consul"
+	//wonaming "github.com/wothing/wonaming/consul"
+	wonaming "github.com/wothing/wonaming/etcd"
 	"github.com/wothing/wonaming/example/pb"
 )
 
 var (
 	serv = flag.String("service", "hello_service", "service name")
 	port = flag.Int("port", 1701, "listening port")
-	cons = flag.String("consul", "127.0.0.1:8500", "consul address")
+	reg  = flag.String("reg", "127.0.0.1:8500", "register address")
 )
 
 func main() {
@@ -28,7 +29,7 @@ func main() {
 		panic(err)
 	}
 
-	err = wonaming.Register(*serv, *port, *cons, time.Second*3, "5s")
+	err = wonaming.Register(*serv, *port, *reg, time.Second*3, 5) 
 	if err != nil {
 		panic(err)
 	}
