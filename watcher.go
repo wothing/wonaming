@@ -3,6 +3,7 @@ package wonaming
 import (
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	consul "github.com/hashicorp/consul/api"
@@ -40,6 +41,7 @@ func (cw *ConsulWatcher) Next() ([]*naming.Update, error) {
 					updates := genUpdates([]string{}, addrs)
 					return updates, nil
 				}
+				log.Println("no such service found in consul, retry")
 			}
 		}
 	}
