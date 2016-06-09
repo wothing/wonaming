@@ -1,6 +1,7 @@
 package consul
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -11,62 +12,68 @@ import (
 	consul "github.com/hashicorp/consul/api"
 )
 
-// Register helps register consul
-func Register(sName string, sPort int, consulAddr string, interval time.Duration, ttl int) error {
-	sAddr := "127.0.0.1"
-	env := os.Getenv("HOSTNAME")
-	if env != "" {
-		sAddr = env
-	}
-
-	conf := &consul.Config{Scheme: "http", Address: consulAddr}
+// Register is the helper function to self-register service into Etcd/Consul server
+// name - service name
+// host - service host
+// port - service port
+// target - consul dial address, for example: "127.0.0.1:8500"
+// interval - interval of self-register to etcd
+// ttl - ttl of the register information
+func Register(name string, host string, port int, target string, interval time.Duration, ttl int) error {
+	conf := &consul.Config{Scheme: "http", Address: target}
 	client, err := consul.NewClient(conf)
 	if err != nil {
-		return err
+		return errors.New(fmt.Sprintf("wonaming: create consul client error: %s", err))
 	}
 
-	serviceID := fmt.Sprintf("%s-%s-%d", sName, sAddr, sPort)
+	serviceID := fmt.Sprintf("%s-%s-%d", name, host, port)
 	regis := &consul.AgentServiceRegistration{
 		ID:      serviceID,
-		Name:    sName,
-		Address: sAddr,
-		Port:    sPort,
+		Name:    name,
+		Address: host,
+		Port:    port,
 	}
 
 	//de-register if meet signhup
 	go func() {
 		ch := make(chan os.Signal, 1)
-		signal.Notify(ch, syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL)
-		log.Println("rec signal: ", <-ch)
+		signal.Notify(ch, syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL, syscall.SIGHUP, syscall.SIGQUIT)
+		log.Println("wonaming: receive signal: ", <-ch)
 
-		err = client.Agent().ServiceDeregister(serviceID)
+		err := client.Agent().ServiceDeregister(serviceID)
 		if err != nil {
-			log.Println("deregister service, result: ", err)
+			log.Println("wonaming: deregister service error: ", err.Error())
+		} else {
+			log.Println("wonaming: deregistered service from consul server.")
 		}
+
 		err = client.Agent().CheckDeregister(serviceID)
 		if err != nil {
-			log.Println("deregister check, result: ", err)
+			log.Println("wonaming: deregister check error: ", err.Error())
 		}
 
 		os.Exit(0)
 	}()
 
+	// routine to update ttl
 	go func() {
 		ticker := time.NewTicker(interval)
 		for {
 			<-ticker.C
 			err = client.Agent().UpdateTTL(serviceID, "", "passing")
 			if err != nil {
-				log.Println("update ttl error: ", err)
+				log.Println("wonaming: update ttl of service error: ", err.Error())
 			}
 		}
 	}()
 
+	// initial register service
 	err = client.Agent().ServiceRegister(regis)
 	if err != nil {
-		return err
+		return errors.New(fmt.Sprintf("wonaming: initial register service '%s' host to consul error: %s", name, err.Error()))
 	}
 
+	// initial register service check
 	check := consul.AgentServiceCheck{TTL: fmt.Sprintf("%ds", ttl), Status: "passing"}
-	return client.Agent().CheckRegister(&consul.AgentCheckRegistration{ID: serviceID, Name: sName, ServiceID: serviceID, AgentServiceCheck: check})
+	return client.Agent().CheckRegister(&consul.AgentCheckRegistration{ID: serviceID, Name: name, ServiceID: serviceID, AgentServiceCheck: check})
 }

@@ -1,5 +1,7 @@
 # wonaming
-Consul-based naming impl for grpc balancer.
+This is the naming Resolver & Watcher implementaion for grpc balancer.
+
+Wonaming supports etcd and consul as the service register and discovery backend.
 
 ## example
 

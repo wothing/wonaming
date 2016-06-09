@@ -4,62 +4,80 @@ import (
 	"fmt"
 
 	etcd "github.com/coreos/etcd/client"
-	"github.com/wothing/wonaming/lib"
+	. "github.com/wothing/wonaming/lib"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/naming"
 )
 
 const (
+	// prefix is the root Dir of services in etcd
 	prefix = "wonaming"
 )
 
+// EtcdWatcher is the implementaion of grpc.naming.Watcher
 type EtcdWatcher struct {
+	// er: EtcdResolver
 	er *EtcdResolver
+	// ec: Etcd Client
 	ec *etcd.Client
-	w  etcd.Watcher
-
+	// addrs is the service addrs cache
 	addrs []string
 }
 
+// Close do nothing
 func (ew *EtcdWatcher) Close() {
 }
 
+// Next to return the updates
 func (ew *EtcdWatcher) Next() ([]*naming.Update, error) {
-	keyapi := etcd.NewKeysAPI(*ew.ec)
+	// key is the etcd key/value dir to watch
 	key := fmt.Sprintf("/%s/%s", prefix, ew.er.ServiceName)
 
-	if ew.addrs == nil {
-		ew.addrs = make([]string, 0)
+	keyapi := etcd.NewKeysAPI(*ew.ec)
 
+	// ew.addrs is nil means it is intially called
+	if ew.addrs == nil {
 		// query addresses from etcd
-		resp, _:= keyapi.Get(context.Background(), key, &etcd.GetOptions{Recursive: true})
+		resp, _ := keyapi.Get(context.Background(), key, &etcd.GetOptions{Recursive: true})
 		addrs := extractAddrs(resp)
+
+		// addrs is not empty, return the updates
+		// addrs is empty, should to watch new data
 		if len(addrs) != 0 {
 			ew.addrs = addrs
-			updates := lib.GenUpdates([]string{}, addrs)
-			return updates, nil
+			return GenUpdates([]string{}, addrs), nil
 		}
 	}
 
-	ew.w = keyapi.Watcher(key, &etcd.WatcherOptions{Recursive: true})
+	// generate etcd Watcher
+	w := keyapi.Watcher(key, &etcd.WatcherOptions{Recursive: true})
 	for {
-		_, err := ew.w.Next(context.Background())
+		_, err := w.Next(context.Background())
 		if err == nil {
 			// query addresses from etcd
-			resp, _:= keyapi.Get(context.Background(), key, &etcd.GetOptions{Recursive: true})
-			addrs := extractAddrs(resp)
-			updates := lib.GenUpdates(ew.addrs, addrs)
+			resp, err := keyapi.Get(context.Background(), key, &etcd.GetOptions{Recursive: true})
+			if err != nil {
+				continue
+			}
 
+			addrs := extractAddrs(resp)
+			updates := GenUpdates(ew.addrs, addrs)
+
+			// update ew.addrs
 			ew.addrs = addrs
+
+			// if addrs updated, return it
 			if len(updates) != 0 {
 				return updates, nil
 			}
 		}
 	}
 
+	// should not goto here for ever
 	return []*naming.Update{}, nil
 }
 
+// helper function to extract addrs rom etcd response
 func extractAddrs(resp *etcd.Response) []string {
 	addrs := []string{}
 	if resp == nil || resp.Node == nil || resp.Node.Nodes == nil || len(resp.Node.Nodes) == 0 {
@@ -67,10 +85,11 @@ func extractAddrs(resp *etcd.Response) []string {
 	}
 
 	for _, node := range resp.Node.Nodes {
-		// node should contain host & port
+		// node should contain host & port both
 		host := ""
 		port := ""
 		for _, v := range node.Nodes {
+			// get the last 4 chars
 			what := v.Key[len(v.Key)-4 : len(v.Key)]
 			if what == "host" {
 				host = v.Value
@@ -79,6 +98,8 @@ func extractAddrs(resp *etcd.Response) []string {
 				port = v.Value
 			}
 		}
+
+		// if one of host&port has no value, the addr is set partly, should not return
 		if host != "" && port != "" {
 			addrs = append(addrs, fmt.Sprintf("%s:%s", host, port))
 		}
