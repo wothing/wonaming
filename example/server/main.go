@@ -30,7 +30,7 @@ func main() {
 		panic(err)
 	}
 
-	err = wonaming.Register(*serv, "127.0.0.1",  *port, *reg, time.Second*3, 5) 
+	err = wonaming.Register(*serv, "127.0.0.1", *port, *reg, time.Second*3, 5)
 	if err != nil {
 		panic(err)
 	}

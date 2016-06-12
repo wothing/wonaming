@@ -1,4 +1,4 @@
-package consul 
+package consul
 
 import (
 	"fmt"
@@ -36,7 +36,7 @@ func (cw *ConsulWatcher) Next() ([]*naming.Update, error) {
 	// If no addrs, need to watch consul
 	if cw.addrs == nil {
 		// must return addrs to balancer, use ticker to query consul till data gotten
-		addrs, li, _:= cw.queryConsul(nil)
+		addrs, li, _ := cw.queryConsul(nil)
 
 		// got addrs, return
 		if len(addrs) != 0 {
@@ -86,4 +86,3 @@ func (cw *ConsulWatcher) queryConsul(q *consul.QueryOptions) ([]string, uint64, 
 
 	return addrs, meta.LastIndex, nil
 }
-

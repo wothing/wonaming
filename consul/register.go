@@ -27,12 +27,6 @@ func Register(name string, host string, port int, target string, interval time.D
 	}
 
 	serviceID := fmt.Sprintf("%s-%s-%d", name, host, port)
-	regis := &consul.AgentServiceRegistration{
-		ID:      serviceID,
-		Name:    name,
-		Address: host,
-		Port:    port,
-	}
 
 	//de-register if meet signhup
 	go func() {
@@ -68,6 +62,12 @@ func Register(name string, host string, port int, target string, interval time.D
 	}()
 
 	// initial register service
+	regis := &consul.AgentServiceRegistration{
+		ID:      serviceID,
+		Name:    name,
+		Address: host,
+		Port:    port,
+	}
 	err = client.Agent().ServiceRegister(regis)
 	if err != nil {
 		return errors.New(fmt.Sprintf("wonaming: initial register service '%s' host to consul error: %s", name, err.Error()))
@@ -75,5 +75,10 @@ func Register(name string, host string, port int, target string, interval time.D
 
 	// initial register service check
 	check := consul.AgentServiceCheck{TTL: fmt.Sprintf("%ds", ttl), Status: "passing"}
-	return client.Agent().CheckRegister(&consul.AgentCheckRegistration{ID: serviceID, Name: name, ServiceID: serviceID, AgentServiceCheck: check})
+	err = client.Agent().CheckRegister(&consul.AgentCheckRegistration{ID: serviceID, Name: name, ServiceID: serviceID, AgentServiceCheck: check})
+	if err != nil {
+		return errors.New(fmt.Sprintf("wonaming: initial register service check to consul error: %s", err.Error()))
+	}
+
+	return nil
 }

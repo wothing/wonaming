@@ -11,7 +11,7 @@ import (
 
 // EtcdResolver is the implementaion of grpc.naming.Resolver
 type EtcdResolver struct {
-	ServiceName string  // service name to resolve
+	ServiceName string // service name to resolve
 }
 
 // NewResolver return EtcdResolver with service name
@@ -33,7 +33,7 @@ func (er *EtcdResolver) Resolve(target string) (naming.Watcher, error) {
 	}
 	client, err := etcd.New(conf)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("wonaming: creat etcd error: %s", err)) 
+		return nil, errors.New(fmt.Sprintf("wonaming: creat etcd error: %s", err))
 	}
 
 	// Return EtcdWatcher
