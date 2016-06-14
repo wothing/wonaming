@@ -27,7 +27,7 @@ func (er *EtcdResolver) Resolve(target string) (naming.Watcher, error) {
 	}
 
 	// generate etcd client, return if error
-	endpoints := strings.Split(target, ";")
+	endpoints := strings.Split(target, ",")
 	conf := etcd.Config{
 		Endpoints: endpoints,
 	}
