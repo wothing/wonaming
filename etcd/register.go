@@ -47,7 +47,7 @@ func Register(name string, host string, port int, target string, interval time.D
 
 		_, err := keyapi.Delete(context.Background(), serviceKey, &etcd.DeleteOptions{Recursive: true})
 		if err != nil {
-			log.Println("wonaming: deregister service error: ", err)
+			log.Println("wonaming: deregister service error: ", err.Error())
 		} else {
 			log.Println("wonaming: deregistered service from etcd server.")
 		}
