@@ -23,7 +23,7 @@ import (
 // ttl - ttl of the register information
 func Register(name string, host string, port int, target string, interval time.Duration, ttl int) error {
 	// get endpoints for register dial address
-	endpoints := strings.Split(target, ";")
+	endpoints := strings.Split(target, ",")
 	conf := etcd.Config{
 		Endpoints: endpoints,
 	}
