@@ -31,7 +31,7 @@ func (cr *ConsulResolver) Resolve(target string) (naming.Watcher, error) {
 	}
 	client, err := consul.NewClient(conf)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("wonaming: creat consul error: %s", err))
+		return nil, fmt.Errorf("wonaming: creat consul error: %v", err)
 	}
 
 	// return ConsulWatcher
