@@ -59,26 +59,26 @@ func Register(name string, host string, port int, target string, interval time.D
 		ticker := time.NewTicker(interval)
 
 		// refresh set to true for not notifying the watcher
-		setopt := &etcd.SetOptions{TTL: time.Duration(ttl) * time.Second, Refresh: true}
+		setopt := &etcd.SetOptions{TTL: time.Duration(ttl) * time.Second, PrevExist: etcd.PrevExist, Dir: true, Refresh: true}
 		for {
 			<-ticker.C
-			if _, err := keyapi.Set(context.Background(), hostKey, "", setopt); err != nil {
-				log.Println("wonaming: update ttl of host key error: ", err.Error())
-			}
-			if _, err := keyapi.Set(context.Background(), portKey, "", setopt); err != nil {
-				log.Println("wonaming: update ttl of port key error: ", err.Error())
+			if _, err := keyapi.Set(context.Background(), serviceKey, "", setopt); err != nil {
+				log.Printf("wonaming: set service '%s' ttl to etcd error: %s\n", name, err.Error())
 			}
 		}
 	}()
 
 	// initial register
-	setopt := &etcd.SetOptions{TTL: time.Duration(ttl) * time.Second}
-	if _, err := keyapi.Set(context.Background(), hostKey, host, setopt); err != nil {
+	if _, err := keyapi.Set(context.Background(), hostKey, host, nil); err != nil {
 		return errors.New(fmt.Sprintf("wonaming: initial register service '%s' host to etcd error: %s", name, err.Error()))
 	}
-	if _, err := keyapi.Set(context.Background(), portKey, fmt.Sprintf("%d", port), setopt); err != nil {
+	if _, err := keyapi.Set(context.Background(), portKey, fmt.Sprintf("%d", port), nil); err != nil {
 		return errors.New(fmt.Sprintf("wonaming: initial register service '%s' port to etcd error: %s", name, err.Error()))
 	}
 
+	setopt := &etcd.SetOptions{TTL: time.Duration(ttl) * time.Second, PrevExist: etcd.PrevExist, Dir: true}
+	if _, err := keyapi.Set(context.Background(), serviceKey, "", setopt); err != nil {
+		return errors.New(fmt.Sprintf("wonaming: set service '%s' ttl to etcd error: %s", name, err.Error()))
+	}
 	return nil
 }

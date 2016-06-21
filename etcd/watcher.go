@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	etcd "github.com/coreos/etcd/client"
+	"github.com/wothing/log"
 	. "github.com/wothing/wonaming/lib"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/naming"
@@ -39,7 +40,8 @@ func (ew *EtcdWatcher) Next() ([]*naming.Update, error) {
 	if ew.addrs == nil {
 		// query addresses from etcd
 		resp, _ := keyapi.Get(context.Background(), key, &etcd.GetOptions{Recursive: true})
-		addrs := extractAddrs(resp)
+		addrs, empty := extractAddrs(resp)
+		dropEmptyDir(keyapi, empty)
 
 		// addrs is not empty, return the updates
 		// addrs is empty, should to watch new data
@@ -60,12 +62,12 @@ func (ew *EtcdWatcher) Next() ([]*naming.Update, error) {
 				continue
 			}
 
-			addrs := extractAddrs(resp)
-			updates := GenUpdates(ew.addrs, addrs)
+			addrs, empty := extractAddrs(resp)
+			dropEmptyDir(keyapi, empty)
 
+			updates := GenUpdates(ew.addrs, addrs)
 			// update ew.addrs
 			ew.addrs = addrs
-
 			// if addrs updated, return it
 			if len(updates) != 0 {
 				return updates, nil
@@ -78,10 +80,12 @@ func (ew *EtcdWatcher) Next() ([]*naming.Update, error) {
 }
 
 // helper function to extract addrs rom etcd response
-func extractAddrs(resp *etcd.Response) []string {
-	addrs := []string{}
+func extractAddrs(resp *etcd.Response) (addrs, empty []string) {
+	addrs = []string{}
+	empty = []string{}
+
 	if resp == nil || resp.Node == nil || resp.Node.Nodes == nil || len(resp.Node.Nodes) == 0 {
-		return addrs
+		return addrs, empty
 	}
 
 	for _, node := range resp.Node.Nodes {
@@ -103,7 +107,23 @@ func extractAddrs(resp *etcd.Response) []string {
 		if host != "" && port != "" {
 			addrs = append(addrs, fmt.Sprintf("%s:%s", host, port))
 		}
+		if host == "" && port == "" {
+			empty = append(empty, node.Key)
+		}
 	}
 
-	return addrs
+	return addrs, empty
+}
+
+func dropEmptyDir(keyapi etcd.KeysAPI, empty []string) {
+	if keyapi == nil || len(empty) == 0 {
+		return
+	}
+
+	for _, key := range empty {
+		_, err := keyapi.Delete(context.Background(), key, &etcd.DeleteOptions{Recursive: true})
+		if err != nil {
+			log.Println("wonaming: delete empty service dir error: ", err.Error())
+		}
+	}
 }
