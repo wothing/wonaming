@@ -33,7 +33,7 @@ func (er *EtcdResolver) Resolve(target string) (naming.Watcher, error) {
 	}
 	client, err := etcd.New(conf)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("wonaming: creat etcd error: %s", err.Error()))
+		return nil, fmt.Errorf("wonaming: creat etcd error: %s", err.Error())
 	}
 
 	// Return EtcdWatcher

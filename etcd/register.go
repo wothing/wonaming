@@ -1,11 +1,11 @@
 package etcd
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -30,7 +30,7 @@ func Register(name string, host string, port int, target string, interval time.D
 
 	client, err := etcd.New(conf)
 	if err != nil {
-		return errors.New(fmt.Sprintf("wonaming: create etcd client error: ", err.Error()))
+		return fmt.Errorf("wonaming: create etcd client error: %v", err)
 	}
 	keyapi := etcd.NewKeysAPI(client)
 
@@ -43,7 +43,8 @@ func Register(name string, host string, port int, target string, interval time.D
 	go func() {
 		ch := make(chan os.Signal, 1)
 		signal.Notify(ch, syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL, syscall.SIGHUP, syscall.SIGQUIT)
-		log.Println("wonaming: receive signal: ", <-ch)
+		x := <-ch
+		log.Println("wonaming: receive signal: ", x)
 
 		_, err := keyapi.Delete(context.Background(), serviceKey, &etcd.DeleteOptions{Recursive: true})
 		if err != nil {
@@ -51,7 +52,11 @@ func Register(name string, host string, port int, target string, interval time.D
 		} else {
 			log.Println("wonaming: deregistered service from etcd server.")
 		}
-		os.Exit(0)
+
+		s, _ := strconv.Atoi(fmt.Sprintf("%d", x))
+
+		os.Exit(s)
+
 	}()
 
 	go func() {
@@ -70,15 +75,15 @@ func Register(name string, host string, port int, target string, interval time.D
 
 	// initial register
 	if _, err := keyapi.Set(context.Background(), hostKey, host, nil); err != nil {
-		return errors.New(fmt.Sprintf("wonaming: initial register service '%s' host to etcd error: %s", name, err.Error()))
+		return fmt.Errorf("wonaming: initial register service '%s' host to etcd error: %s", name, err.Error())
 	}
 	if _, err := keyapi.Set(context.Background(), portKey, fmt.Sprintf("%d", port), nil); err != nil {
-		return errors.New(fmt.Sprintf("wonaming: initial register service '%s' port to etcd error: %s", name, err.Error()))
+		return fmt.Errorf("wonaming: initial register service '%s' port to etcd error: %s", name, err.Error())
 	}
 
 	setopt := &etcd.SetOptions{TTL: time.Duration(ttl) * time.Second, PrevExist: etcd.PrevExist, Dir: true}
 	if _, err := keyapi.Set(context.Background(), serviceKey, "", setopt); err != nil {
-		return errors.New(fmt.Sprintf("wonaming: set service '%s' ttl to etcd error: %s", name, err.Error()))
+		return fmt.Errorf("wonaming: set service '%s' ttl to etcd error: %s", name, err.Error())
 	}
 	return nil
 }
