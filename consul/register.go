@@ -1,11 +1,11 @@
 package consul
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -23,7 +23,7 @@ func Register(name string, host string, port int, target string, interval time.D
 	conf := &consul.Config{Scheme: "http", Address: target}
 	client, err := consul.NewClient(conf)
 	if err != nil {
-		return errors.New(fmt.Sprintf("wonaming: create consul client error: %s", err))
+		return fmt.Errorf("wonaming: create consul client error: %v", err)
 	}
 
 	serviceID := fmt.Sprintf("%s-%s-%d", name, host, port)
@@ -32,7 +32,8 @@ func Register(name string, host string, port int, target string, interval time.D
 	go func() {
 		ch := make(chan os.Signal, 1)
 		signal.Notify(ch, syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL, syscall.SIGHUP, syscall.SIGQUIT)
-		log.Println("wonaming: receive signal: ", <-ch)
+		x := <-ch
+		log.Println("wonaming: receive signal: ", x)
 
 		err := client.Agent().ServiceDeregister(serviceID)
 		if err != nil {
@@ -46,7 +47,9 @@ func Register(name string, host string, port int, target string, interval time.D
 			log.Println("wonaming: deregister check error: ", err.Error())
 		}
 
-		os.Exit(0)
+		s, _ := strconv.Atoi(fmt.Sprintf("%d", x))
+
+		os.Exit(s)
 	}()
 
 	// routine to update ttl
@@ -70,14 +73,14 @@ func Register(name string, host string, port int, target string, interval time.D
 	}
 	err = client.Agent().ServiceRegister(regis)
 	if err != nil {
-		return errors.New(fmt.Sprintf("wonaming: initial register service '%s' host to consul error: %s", name, err.Error()))
+		return fmt.Errorf("wonaming: initial register service '%s' host to consul error: %s", name, err.Error())
 	}
 
 	// initial register service check
 	check := consul.AgentServiceCheck{TTL: fmt.Sprintf("%ds", ttl), Status: "passing"}
 	err = client.Agent().CheckRegister(&consul.AgentCheckRegistration{ID: serviceID, Name: name, ServiceID: serviceID, AgentServiceCheck: check})
 	if err != nil {
-		return errors.New(fmt.Sprintf("wonaming: initial register service check to consul error: %s", err.Error()))
+		return fmt.Errorf("wonaming: initial register service check to consul error: %s", err.Error())
 	}
 
 	return nil
