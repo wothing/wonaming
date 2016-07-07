@@ -69,14 +69,14 @@ func Register(name string, host string, port int, target string, interval time.D
 			_, err := keyapi.Get(context.Background(), serviceKey, &etcd.GetOptions{Recursive: true})
 			if err != nil {
 				if _, err := keyapi.Set(context.Background(), hostKey, host, nil); err != nil {
-					log.Printf("wonaming: initial register service '%s' host to etcd error: %s", name, err.Error())
+					log.Printf("wonaming: re-register service '%s' host to etcd error: %s\n", name, err.Error())
 				}
 				if _, err := keyapi.Set(context.Background(), portKey, fmt.Sprintf("%d", port), nil); err != nil {
-					log.Printf("wonaming: initial register service '%s' port to etcd error: %s", name, err.Error())
+					log.Printf("wonaming: re-register service '%s' port to etcd error: %s\n", name, err.Error())
 				}
 				setopt := &etcd.SetOptions{TTL: time.Duration(ttl) * time.Second, PrevExist: etcd.PrevExist, Dir: true}
 				if _, err := keyapi.Set(context.Background(), serviceKey, "", setopt); err != nil {
-					log.Printf("wonaming: set service '%s' ttl to etcd error: %s", name, err.Error())
+					log.Printf("wonaming: set service '%s' ttl to etcd error: %s\n", name, err.Error())
 				}
 			} else {
 				// refresh set to true for not notifying the watcher
