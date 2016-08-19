@@ -123,7 +123,7 @@ func dropEmptyDir(keyapi etcd.KeysAPI, empty []string) {
 	for _, key := range empty {
 		_, err := keyapi.Delete(context.Background(), key, &etcd.DeleteOptions{Recursive: true})
 		if err != nil {
-			log.Println("wonaming: delete empty service dir error: ", err.Error())
+			log.Print("wonaming: delete empty service dir error: ", err.Error())
 		}
 	}
 }
