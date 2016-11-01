@@ -35,9 +35,9 @@ func Register(name string, host string, port int, target string, interval time.D
 	keyapi := etcd.NewKeysAPI(client)
 
 	serviceID := fmt.Sprintf("%s-%s-%d", name, host, port)
-	serviceKey := fmt.Sprintf("/%s/%s/%s", prefix, name, serviceID)
-	hostKey := fmt.Sprintf("/%s/%s/%s/host", prefix, name, serviceID)
-	portKey := fmt.Sprintf("/%s/%s/%s/port", prefix, name, serviceID)
+	serviceKey := fmt.Sprintf("/%s/%s/%s", Prefix, name, serviceID)
+	hostKey := fmt.Sprintf("/%s/%s/%s/host", Prefix, name, serviceID)
+	portKey := fmt.Sprintf("/%s/%s/%s/port", Prefix, name, serviceID)
 
 	//de-register if meet signhup
 	go func() {
