@@ -10,10 +10,8 @@ import (
 	"google.golang.org/grpc/naming"
 )
 
-const (
-	// prefix is the root Dir of services in etcd
-	prefix = "wonaming"
-)
+// prefix is the root Dir of services in etcd
+var Prefix = "wonaming"
 
 // EtcdWatcher is the implementaion of grpc.naming.Watcher
 type EtcdWatcher struct {
@@ -32,7 +30,7 @@ func (ew *EtcdWatcher) Close() {
 // Next to return the updates
 func (ew *EtcdWatcher) Next() ([]*naming.Update, error) {
 	// key is the etcd key/value dir to watch
-	key := fmt.Sprintf("/%s/%s", prefix, ew.er.ServiceName)
+	key := fmt.Sprintf("/%s/%s", Prefix, ew.er.ServiceName)
 
 	keyapi := etcd.NewKeysAPI(*ew.ec)
 
