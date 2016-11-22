@@ -55,8 +55,9 @@ func Register(name string, host string, port int, target string, interval time.D
 
 		s, _ := strconv.Atoi(fmt.Sprintf("%d", x))
 
+		log.Printf("wonaming: %d, sleep 1 second to wait for other goruntines destory", s)
+		time.Sleep(time.Second)
 		os.Exit(s)
-
 	}()
 
 	go func() {
