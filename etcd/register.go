@@ -3,18 +3,18 @@ package etcd
 import (
 	"fmt"
 	"log"
-	"os"
-	"os/signal"
-	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	etcd "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
 )
 
+var keyapi etcd.KeysAPI
+var serviceKey string
+
 // Register is the helper function to self-register service into Etcd/Consul server
+// should call Unregister when pocess stop
 // name - service name
 // host - service host
 // port - service port
@@ -32,33 +32,12 @@ func Register(name string, host string, port int, target string, interval time.D
 	if err != nil {
 		return fmt.Errorf("wonaming: create etcd client error: %v", err)
 	}
-	keyapi := etcd.NewKeysAPI(client)
+	keyapi = etcd.NewKeysAPI(client)
 
 	serviceID := fmt.Sprintf("%s-%s-%d", name, host, port)
-	serviceKey := fmt.Sprintf("/%s/%s/%s", Prefix, name, serviceID)
+	serviceKey = fmt.Sprintf("/%s/%s/%s", Prefix, name, serviceID)
 	hostKey := fmt.Sprintf("/%s/%s/%s/host", Prefix, name, serviceID)
 	portKey := fmt.Sprintf("/%s/%s/%s/port", Prefix, name, serviceID)
-
-	//de-register if meet signhup
-	go func() {
-		ch := make(chan os.Signal, 1)
-		signal.Notify(ch, syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL, syscall.SIGHUP, syscall.SIGQUIT)
-		x := <-ch
-		log.Println("wonaming: receive signal: ", x)
-
-		_, err := keyapi.Delete(context.Background(), serviceKey, &etcd.DeleteOptions{Recursive: true})
-		if err != nil {
-			log.Println("wonaming: deregister service error: ", err.Error())
-		} else {
-			log.Println("wonaming: deregistered service from etcd server.")
-		}
-
-		s, _ := strconv.Atoi(fmt.Sprintf("%d", x))
-
-		log.Printf("wonaming: %d, sleep 1 second to wait for other goruntines destory", s)
-		time.Sleep(time.Second)
-		os.Exit(s)
-	}()
 
 	go func() {
 		// invoke self-register with ticker
@@ -102,4 +81,15 @@ func Register(name string, host string, port int, target string, interval time.D
 	}
 
 	return nil
+}
+
+// Unregister delete service from etcd
+func Unregister() error {
+	_, err := keyapi.Delete(context.Background(), serviceKey, &etcd.DeleteOptions{Recursive: true})
+	if err != nil {
+		log.Println("wonaming: deregister service error: ", err.Error())
+	} else {
+		log.Println("wonaming: deregistered service from etcd server.")
+	}
+	return err
 }
