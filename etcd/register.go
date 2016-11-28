@@ -10,7 +10,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-var keyapi etcd.KeysAPI
+var client etcd.Client
 var serviceKey string
 
 // Register is the helper function to self-register service into Etcd/Consul server
@@ -28,11 +28,12 @@ func Register(name string, host string, port int, target string, interval time.D
 		Endpoints: endpoints,
 	}
 
-	client, err := etcd.New(conf)
+	var err error
+	client, err = etcd.New(conf)
 	if err != nil {
 		return fmt.Errorf("wonaming: create etcd client error: %v", err)
 	}
-	keyapi = etcd.NewKeysAPI(client)
+	keyapi := etcd.NewKeysAPI(client)
 
 	serviceID := fmt.Sprintf("%s-%s-%d", name, host, port)
 	serviceKey = fmt.Sprintf("/%s/%s/%s", Prefix, name, serviceID)
@@ -85,6 +86,7 @@ func Register(name string, host string, port int, target string, interval time.D
 
 // Unregister delete service from etcd
 func Unregister() error {
+	keyapi := etcd.NewKeysAPI(client)
 	_, err := keyapi.Delete(context.Background(), serviceKey, &etcd.DeleteOptions{Recursive: true})
 	if err != nil {
 		log.Println("wonaming: deregister service error: ", err.Error())
