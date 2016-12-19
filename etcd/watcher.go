@@ -2,6 +2,7 @@ package etcd
 
 import (
 	"fmt"
+	"sync"
 
 	etcd "github.com/coreos/etcd/client"
 	"github.com/wothing/log"
@@ -12,6 +13,7 @@ import (
 
 // prefix is the root Dir of services in etcd
 var Prefix = "wonaming"
+var locker = sync.Mutex{}
 
 // EtcdWatcher is the implementaion of grpc.naming.Watcher
 type EtcdWatcher struct {
@@ -36,6 +38,7 @@ func (ew *EtcdWatcher) Next() ([]*naming.Update, error) {
 
 	// ew.addrs is nil means it is intially called
 	if ew.addrs == nil {
+		locker.Lock()
 		// query addresses from etcd
 		resp, _ := keyapi.Get(context.Background(), key, &etcd.GetOptions{Recursive: true})
 		addrs, empty := extractAddrs(resp)
@@ -45,8 +48,11 @@ func (ew *EtcdWatcher) Next() ([]*naming.Update, error) {
 		// addrs is empty, should to watch new data
 		if len(addrs) != 0 {
 			ew.addrs = addrs
-			return GenUpdates([]string{}, addrs), nil
+			updates := GenUpdates([]string{}, addrs)
+			locker.Unlock()
+			return updates, nil
 		}
+		locker.Unlock()
 	}
 
 	// generate etcd Watcher
@@ -54,6 +60,7 @@ func (ew *EtcdWatcher) Next() ([]*naming.Update, error) {
 	for {
 		_, err := w.Next(context.Background())
 		if err == nil {
+			locker.Lock()
 			// query addresses from etcd
 			resp, err := keyapi.Get(context.Background(), key, &etcd.GetOptions{Recursive: true})
 			if err != nil {
@@ -62,10 +69,12 @@ func (ew *EtcdWatcher) Next() ([]*naming.Update, error) {
 
 			addrs, empty := extractAddrs(resp)
 			dropEmptyDir(keyapi, empty)
-
-			updates := GenUpdates(ew.addrs, addrs)
 			// update ew.addrs
 			ew.addrs = addrs
+
+			updates := GenUpdates(ew.addrs, addrs)
+
+			locker.Unlock()
 			// if addrs updated, return it
 			if len(updates) != 0 {
 				return updates, nil
