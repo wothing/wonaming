@@ -1,97 +1,84 @@
+/**
+ * Copyright 2015-2016, Wothing Co., Ltd.
+ * All rights reserved.
+ *
+ * Created by elvizlai on 2016/12/19 17:40.
+ */
+
 package etcd
 
 import (
+	"time"
+	"strings"
 	"fmt"
 	"log"
-	"strings"
-	"time"
 
-	etcd "github.com/coreos/etcd/client"
+	etcd2 "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
 )
 
-var client etcd.Client
+var Prefix = "wonaming"
+var client etcd2.Client
 var serviceKey string
 
-// Register is the helper function to self-register service into Etcd/Consul server
-// should call Unregister when pocess stop
-// name - service name
-// host - service host
-// port - service port
-// target - etcd dial address, for example: "http://127.0.0.1:2379;http://127.0.0.1:12379"
-// interval - interval of self-register to etcd
-// ttl - ttl of the register information
+var stopSignal = make(chan bool, 1)
+
+// Register
 func Register(name string, host string, port int, target string, interval time.Duration, ttl int) error {
+	serviceValue := fmt.Sprintf("%s:%d", host, port)
+	serviceKey = fmt.Sprintf("/%s/%s/%s", Prefix, name, serviceValue)
+
 	// get endpoints for register dial address
-	endpoints := strings.Split(target, ",")
-	conf := etcd.Config{
-		Endpoints: endpoints,
-	}
-
 	var err error
-	client, err = etcd.New(conf)
+	client, err = etcd2.New(etcd2.Config{
+		Endpoints: strings.Split(target, ","),
+	})
 	if err != nil {
-		return fmt.Errorf("wonaming: create etcd client error: %v", err)
+		return fmt.Errorf("wonaming: create etcd2 client failed: %v", err)
 	}
-	keyapi := etcd.NewKeysAPI(client)
 
-	serviceID := fmt.Sprintf("%s-%s-%d", name, host, port)
-	serviceKey = fmt.Sprintf("/%s/%s/%s", Prefix, name, serviceID)
-	hostKey := fmt.Sprintf("/%s/%s/%s/host", Prefix, name, serviceID)
-	portKey := fmt.Sprintf("/%s/%s/%s/port", Prefix, name, serviceID)
-
+	keysAPI := etcd2.NewKeysAPI(client)
 	go func() {
 		// invoke self-register with ticker
 		ticker := time.NewTicker(interval)
-
-		// should get first, if not exist, set it
+		setOptions := &etcd2.SetOptions{TTL: time.Second * time.Duration(ttl), Refresh: true}
 		for {
-			<-ticker.C
-			_, err := keyapi.Get(context.Background(), serviceKey, &etcd.GetOptions{Recursive: true})
+			// should get first, if not exist, set it
+			_, err := keysAPI.Get(context.Background(), serviceKey, &etcd2.GetOptions{Recursive: true})
 			if err != nil {
-				if _, err := keyapi.Set(context.Background(), hostKey, host, nil); err != nil {
-					log.Printf("wonaming: re-register service '%s' host to etcd error: %s\n", name, err.Error())
-				}
-				if _, err := keyapi.Set(context.Background(), portKey, fmt.Sprintf("%d", port), nil); err != nil {
-					log.Printf("wonaming: re-register service '%s' port to etcd error: %s\n", name, err.Error())
-				}
-				setopt := &etcd.SetOptions{TTL: time.Duration(ttl) * time.Second, PrevExist: etcd.PrevExist, Dir: true}
-				if _, err := keyapi.Set(context.Background(), serviceKey, "", setopt); err != nil {
-					log.Printf("wonaming: set service '%s' ttl to etcd error: %s\n", name, err.Error())
+				if etcd2.IsKeyNotFound(err) {
+					if _, err := keysAPI.Set(context.Background(), serviceKey, serviceValue, &etcd2.SetOptions{TTL: time.Second * time.Duration(ttl)}); err != nil {
+						log.Printf("wonaming: set service '%s' with ttl to etcd2 failed: %s", name, err.Error())
+					}
+				} else {
+					log.Printf("wonaming: get service '%s' from etcd2 failed: %s", name, err.Error())
 				}
 			} else {
 				// refresh set to true for not notifying the watcher
-				setopt := &etcd.SetOptions{TTL: time.Duration(ttl) * time.Second, PrevExist: etcd.PrevExist, Dir: true, Refresh: true}
-				if _, err := keyapi.Set(context.Background(), serviceKey, "", setopt); err != nil {
-					log.Printf("wonaming: set service '%s' ttl to etcd error: %s\n", name, err.Error())
+				if _, err := keysAPI.Set(context.Background(), serviceKey, "", setOptions); err != nil {
+					log.Printf("wonaming: refresh service '%s' with ttl to etcd2 failed: %s", name, err.Error())
 				}
+			}
+			select {
+			case <-stopSignal:
+				return
+			case <-ticker.C:
 			}
 		}
 	}()
 
-	// initial register
-	if _, err := keyapi.Set(context.Background(), hostKey, host, nil); err != nil {
-		return fmt.Errorf("wonaming: initial register service '%s' host to etcd error: %s", name, err.Error())
-	}
-	if _, err := keyapi.Set(context.Background(), portKey, fmt.Sprintf("%d", port), nil); err != nil {
-		return fmt.Errorf("wonaming: initial register service '%s' port to etcd error: %s", name, err.Error())
-	}
-	setopt := &etcd.SetOptions{TTL: time.Duration(ttl) * time.Second, PrevExist: etcd.PrevExist, Dir: true}
-	if _, err := keyapi.Set(context.Background(), serviceKey, "", setopt); err != nil {
-		return fmt.Errorf("wonaming: set service '%s' ttl to etcd error: %s", name, err.Error())
-	}
-
 	return nil
 }
 
-// Unregister delete service from etcd
-func Unregister() error {
-	keyapi := etcd.NewKeysAPI(client)
-	_, err := keyapi.Delete(context.Background(), serviceKey, &etcd.DeleteOptions{Recursive: true})
+// UnRegister delete registered service from etcd
+func UnRegister() error {
+	stopSignal <- true
+	stopSignal = make(chan bool, 1) // just a hack to avoid multi UnRegister deadlock
+	_, err := etcd2.NewKeysAPI(client).Delete(context.Background(), serviceKey, &etcd2.DeleteOptions{Recursive: true})
 	if err != nil {
-		log.Println("wonaming: deregister service error: ", err.Error())
+		log.Printf("wonaming: deregister '%s' failed: %s", serviceKey, err.Error())
 	} else {
-		log.Println("wonaming: deregistered service from etcd server.")
+		log.Printf("wonaming: deregister '%s' ok.", serviceKey)
 	}
 	return err
 }
