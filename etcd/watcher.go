@@ -59,7 +59,7 @@ func (w *watcher) Next() ([]*naming.Update, error) {
 			case "set":
 				return []*naming.Update{{Op: naming.Add, Addr: resp.Node.Value}}, nil
 			case "delete", "expire":
-				return []*naming.Update{{Op: naming.Delete, Addr: strings.TrimPrefix(resp.Node.Key, dir)}}, nil// not using PrevNode because it may nil
+				return []*naming.Update{{Op: naming.Delete, Addr: strings.TrimPrefix(resp.Node.Key, dir)}}, nil // not using PrevNode because it may nil
 			}
 		}
 	}

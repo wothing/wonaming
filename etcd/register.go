@@ -17,6 +17,7 @@ import (
 	"golang.org/x/net/context"
 )
 
+// Prefix should start and end with no slash
 var Prefix = "wonaming"
 var client etcd2.Client
 var serviceKey string
@@ -41,7 +42,7 @@ func Register(name string, host string, port int, target string, interval time.D
 	go func() {
 		// invoke self-register with ticker
 		ticker := time.NewTicker(interval)
-		setOptions := &etcd2.SetOptions{TTL: time.Second * time.Duration(ttl), Refresh: true}
+		setOptions := &etcd2.SetOptions{TTL: time.Second * time.Duration(ttl), Refresh: true, PrevExist: etcd2.PrevExist}
 		for {
 			// should get first, if not exist, set it
 			_, err := keysAPI.Get(context.Background(), serviceKey, &etcd2.GetOptions{Recursive: true})
