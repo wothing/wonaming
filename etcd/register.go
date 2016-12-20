@@ -8,10 +8,10 @@
 package etcd
 
 import (
-	"time"
-	"strings"
 	"fmt"
 	"log"
+	"strings"
+	"time"
 
 	etcd2 "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
