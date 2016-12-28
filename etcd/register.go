@@ -52,7 +52,7 @@ func Register(name string, host string, port int, target string, interval time.D
 						log.Printf("wonaming: set service '%s' with ttl to etcd2 failed: %s", name, err.Error())
 					}
 				} else {
-					log.Printf("wonaming: get service '%s' from etcd2 failed: %s", name, err.Error())
+					log.Printf("wonaming: service '%s' connect to etcd2 failed: %s", name, err.Error())
 				}
 			} else {
 				// refresh set to true for not notifying the watcher
