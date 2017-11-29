@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package pb;
+
+message Payload {
+    string data = 1;
+}
+
+service HelloService {
+    rpc Echo (Payload) returns (Payload) {
+    };
+}
