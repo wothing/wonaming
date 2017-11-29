@@ -65,11 +65,6 @@ func (r etcdResolver) Close() {
 	log.Println("Close")
 }
 
-// NewAddress calls cc.NewAddress.
-func (r *etcdResolver) NewAddress(addrs []resolver.Address) {
-	r.cc.NewAddress(addrs)
-}
-
 func (r *etcdResolver) watch(keyPrefix string) {
 	var addrList []resolver.Address
 

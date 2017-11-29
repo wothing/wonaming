@@ -16,7 +16,7 @@ import (
 	"github.com/coreos/etcd/clientv3"
 )
 
-// etc
+// Register register service with name as prefix to etcd, multi etcd addr should use ; to split
 func Register(etcdAddr, name string, addr string, ttl int64) error {
 	var err error
 
@@ -32,21 +32,23 @@ func Register(etcdAddr, name string, addr string, ttl int64) error {
 
 	ticker := time.NewTicker(time.Second * time.Duration(ttl))
 
-	for {
-		getResp, err := cli.Get(context.Background(), "/"+schema+"/"+name+"/"+addr)
-		if err != nil {
-			log.Println(err)
-		} else if getResp.Count == 0 {
-			err = withAlive(name, addr, ttl)
+	go func() {
+		for {
+			getResp, err := cli.Get(context.Background(), "/"+schema+"/"+name+"/"+addr)
 			if err != nil {
 				log.Println(err)
+			} else if getResp.Count == 0 {
+				err = withAlive(name, addr, ttl)
+				if err != nil {
+					log.Println(err)
+				}
+			} else {
+				// do nothing
 			}
-		} else {
-			// do nothing
-		}
 
-		<-ticker.C
-	}
+			<-ticker.C
+		}
+	}()
 
 	return nil
 }
@@ -69,6 +71,7 @@ func withAlive(name string, addr string, ttl int64) error {
 	return nil
 }
 
+// UnRegister remove service from etcd
 func UnRegister(name string, addr string) {
 	if cli != nil {
 		cli.Delete(context.Background(), "/"+schema+"/"+name+"/"+addr)
