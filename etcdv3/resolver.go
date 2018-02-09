@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/mvcc/mvccpb"
 	"google.golang.org/grpc/resolver"
 )
 
@@ -84,12 +83,12 @@ func (r *etcdResolver) watch(keyPrefix string) {
 		for _, ev := range n.Events {
 			addr := strings.TrimPrefix(string(ev.Kv.Key), keyPrefix)
 			switch ev.Type {
-			case mvccpb.PUT:
+			case clientv3.EventTypePut:
 				if !exist(addrList, addr) {
 					addrList = append(addrList, resolver.Address{Addr: addr})
 					r.cc.NewAddress(addrList)
 				}
-			case mvccpb.DELETE:
+			case clientv3.EventTypeDelete:
 				if s, ok := remove(addrList, addr); ok {
 					addrList = s
 					r.cc.NewAddress(addrList)
