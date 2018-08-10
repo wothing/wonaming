@@ -63,11 +63,6 @@ func withAlive(name string, addr string, ttl int64) error {
 	if err != nil {
 		return err
 	}
-
-	_, err = cli.KeepAlive(context.Background(), leaseResp.ID)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
