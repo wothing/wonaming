@@ -16,17 +16,14 @@ import (
 
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/resolver"
 )
 
 func main() {
-	rr := balancer.Get("round_robin")
-
 	r := etcdv3.NewResolver("localhost:2379")
 	resolver.Register(r)
 
-	conn, err := grpc.Dial(r.Scheme()+"://author/project/test", grpc.WithBalancerBuilder(rr), grpc.WithInsecure())
+	conn, err := grpc.Dial(r.Scheme()+"://author/project/test", grpc.WithBalancerName("round_robin"), grpc.WithInsecure())
 	if err != nil {
 		panic(err)
 	}
