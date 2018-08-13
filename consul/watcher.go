@@ -3,6 +3,7 @@ package consul
 import (
 	"fmt"
 	"time"
+	"strings"
 
 	consul "github.com/hashicorp/consul/api"
 	. "github.com/wothing/wonaming/lib"
@@ -27,6 +28,28 @@ type ConsulWatcher struct {
 
 // Close do nonthing
 func (cw *ConsulWatcher) Close() {
+}
+
+func (cw *ConsulWatcher) tag() string {
+	var tag string
+	
+	split := strings.Split(cw.cr.ServiceName, ".")
+	if len(split) == 2 {
+		tag = split[0]
+	}
+	
+	return tag
+}
+
+func (cw *ConsulWatcher) name() string {
+	name := cw.cr.ServiceName
+	
+	split := strings.Split(cw.cr.ServiceName, ".")
+	if len(split) == 2 {
+		name = split[1]
+	}
+	
+	return name
 }
 
 // Next to return the updates
@@ -73,7 +96,7 @@ func (cw *ConsulWatcher) Next() ([]*naming.Update, error) {
 // queryConsul is helper function to query consul
 func (cw *ConsulWatcher) queryConsul(q *consul.QueryOptions) ([]string, uint64, error) {
 	// query consul
-	cs, meta, err := cw.cc.Health().Service(cw.cr.ServiceName, "", true, q)
+	cs, meta, err := cw.cc.Health().Service(cw.name(), cw.tag(), true, q)
 	if err != nil {
 		return nil, 0, err
 	}
